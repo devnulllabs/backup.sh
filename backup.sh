@@ -59,6 +59,30 @@ function parse_arguments() {
     readonly REMOTE_HOST
 }
 
+function backup_to_local_directory() {
+    local snapshot_dir
+    local snapshot_file
+    local snapshot_basename
+    local status
+    snapshot_basename="${TARGET_DIRECTORY/${HOME}\//}"
+    snapshot_dir="${SNAPSHOT_DIRECTORY}${snapshot_basename}"
+    snapshot_file="${snapshot_dir}.snapshot"
+    if [[ "${VERBOSE}" == "true" ]]; then
+        status="progress"
+    else
+        status="none"
+    fi
+    mkdir -p "${snapshot_dir}"
+    if [[ "${FULL}" == "true" && -f "${snapshot_file}" ]]; then
+        rm "${snapshot_file}"
+        touch "${snapshot_file}"
+    fi
+    mkdir -p "$(dirname "${DESTINATION_DIRECTORY}/${snapshot_basename}")"
+    tar -zcg "${snapshot_file}" --exclude-from="${EXCLUDES_FILE}" "${TARGET_DIRECTORY}" | \
+         gpg --encrypt --recipient="${GPG_KEY_ID}" | \
+         dd of="${DESTINATION_DIRECTORY}/${snapshot_basename}-$(date --iso-8601=minutes).tar.gz.gpg" status="${status}"
+}
+
 function backup_to_remote_host() {
     local snapshot_dir
     local snapshot_file
@@ -96,6 +120,8 @@ function main() {
     fi
     if [[ -n "${REMOTE_HOST}" ]]; then
         backup_to_remote_host
+    else
+        backup_to_local_directory
     fi
 }
 
