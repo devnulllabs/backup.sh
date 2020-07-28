@@ -59,6 +59,12 @@ function parse_arguments() {
     readonly REMOTE_HOST
 }
 
+function touch_excludes_file() {
+    # if the excludes file does not exist, we will create it with nothing
+    mkdir -p "$(dirname "${EXCLUDES_FILE}")"
+    touch "${EXCLUDES_FILE}"
+}
+
 function backup_to_local_directory() {
     local snapshot_dir
     local snapshot_file
@@ -117,6 +123,10 @@ function main() {
         error "Missing required arguments"
         usage
         exit 1
+    fi
+    if [[ ! -f "${EXCLUDES_FILE}" ]]; then
+        echo "touch touch touch"
+        touch_excludes_file
     fi
     if [[ -n "${REMOTE_HOST}" ]]; then
         backup_to_remote_host
