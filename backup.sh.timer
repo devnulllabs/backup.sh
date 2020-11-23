@@ -1,0 +1,10 @@
+[Unit]
+Description=Example Backup Timer
+
+[Timer]
+Persistent=false
+OnCalendar=hourly
+Unit=backup.sh.service
+
+[Install]
+WantedBy=default.target

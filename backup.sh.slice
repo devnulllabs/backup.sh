@@ -1,0 +1,13 @@
+[Unit]
+Description=Example Backup Slice
+DefaultDependencies=no
+Before=slices.target
+
+[Slice]
+CPUAccounting=true
+CPUQuota=20%
+MemmoryAccounting=true
+MemoryLimit=3.0G
+TasksAccounting=true
+IOAccounting=true
+TasksMax=1

@@ -1,0 +1,7 @@
+[Unit]
+Description=Example backup.sh service
+
+[Service]
+Environment=GPG_KEY_ID=...
+ExecStart=backup.sh -h remote-host -d backup-landing backup folders
+Slice=backup.sh.slice
