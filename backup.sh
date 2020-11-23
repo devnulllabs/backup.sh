@@ -23,14 +23,15 @@
 VERBOSE="false"
 FULL="false"
 DESTINATION_DIRECTORY=""
-TARGET_DIRECTORY=""
+TARGET_DIRECTORIES=""
 REMOTE_HOST=""
 GPG_KEY_ID="${GPG_KEY_ID:-}"
 EXCLUDES_FILE="${HOME}/.config/backup.sh/exclude-patterns"
-SNAPSHOT_DIRECTORY="${HOME}/.config/backup.sh/snapshots/"
+SNAPSHOT_DIRECTORY="${HOME}/.cache/backup.sh/snapshots/"
+ARCHIVE_NAME="backup"
 
 function usage() {
-    echo "backup.sh [-v] [-f] [-h <remote host>] -t <target folder> -d <destination>"
+    echo "backup.sh [-v] [-f] [-h <remote host>] -d <destination> <TARGETS>"
 }
 
 function error() {
@@ -38,25 +39,24 @@ function error() {
 }
 
 function parse_arguments() {
-    while getopts 'vfh:d:t:' flag; do
+    while getopts 'vfh:d:n:' flag; do
         case "${flag}" in
             v) VERBOSE='true' ;;
             f) FULL='true' ;;
-            t) TARGET_DIRECTORY="${OPTARG}" ;;
             d) DESTINATION_DIRECTORY="${OPTARG}" ;;
             h) REMOTE_HOST="${OPTARG}" ;;
-            *)
-                error "Invalid argument/option passed"
-                usage
-                exit 1
-                ;;
+            n) ARCHIVE_NAME="${OPTARG}" ;;
+            *) ;;
         esac
     done
+    shift "$((OPTIND -1))"
+    read -ra TARGET_DIRECTORIES <<<"$*"
     readonly VERBOSE
     readonly FULL
     readonly DESTINATION_DIRECTORY
-    readonly TARGET_DIRECTORY
+    readonly TARGET_DIRECTORIES
     readonly REMOTE_HOST
+    readonly ARCHIVE_NAME
 }
 
 function touch_excludes_file() {
@@ -66,51 +66,43 @@ function touch_excludes_file() {
 }
 
 function backup_to_local_directory() {
-    local snapshot_dir
-    local snapshot_file
-    local snapshot_basename
     local status
-    snapshot_basename="${TARGET_DIRECTORY/${HOME}\//}"
-    snapshot_dir="${SNAPSHOT_DIRECTORY}${snapshot_basename}"
-    snapshot_file="${snapshot_dir}.snapshot"
+    local snar_file
+    snar_file="${SNAPSHOT_DIRECTORY}/${ARCHIVE_NAME}.snar"
     if [[ "${VERBOSE}" == "true" ]]; then
         status="progress"
     else
         status="none"
     fi
-    mkdir -p "${snapshot_dir}"
-    if [[ "${FULL}" == "true" && -f "${snapshot_file}" ]]; then
-        rm "${snapshot_file}"
-        touch "${snapshot_file}"
+    mkdir -p "${SNAPSHOT_DIRECTORY}"
+    if [[ "${FULL}" == "true" && -f "${snar_file}" ]]; then
+        rm "${snar_file}"
+        touch "${snar_file}"
     fi
-    mkdir -p "$(dirname "${DESTINATION_DIRECTORY}/${snapshot_basename}")"
-    tar -zcg "${snapshot_file}" --exclude-from="${EXCLUDES_FILE}" "${TARGET_DIRECTORY}" | \
+    mkdir -p "$(dirname "${DESTINATION_DIRECTORY}/")"
+    tar -zcg "${snar_file}" --exclude-from="${EXCLUDES_FILE}" "${TARGET_DIRECTORIES[@]}" | \
          gpg --encrypt --recipient="${GPG_KEY_ID}" | \
-         dd of="${DESTINATION_DIRECTORY}/${snapshot_basename}-$(date --iso-8601=minutes).tar.gz.gpg" status="${status}"
+         dd of="${DESTINATION_DIRECTORY}/${ARCHIVE_NAME}-$(date --iso-8601=minutes).tar.gz.gpg" status="${status}"
 }
 
 function backup_to_remote_host() {
-    local snapshot_dir
-    local snapshot_file
-    local snapshot_basename
     local status
-    snapshot_basename="${TARGET_DIRECTORY/${HOME}\//}"
-    snapshot_dir="${SNAPSHOT_DIRECTORY}${snapshot_basename}"
-    snapshot_file="${snapshot_dir}.snapshot"
+    local snar_file
+    snar_file="${SNAPSHOT_DIRECTORY}/${ARCHIVE_NAME}.snar"
     if [[ "${VERBOSE}" == "true" ]]; then
         status="progress"
     else
         status="none"
     fi
-    mkdir -p "${snapshot_dir}"
-    if [[ "${FULL}" == "true" && -f "${snapshot_file}" ]]; then
-        rm "${snapshot_file}"
-        touch "${snapshot_file}"
+    mkdir -p "${SNAPSHOT_DIRECTORY}"
+    if [[ "${FULL}" == "true" && -f "${snar_file}" ]]; then
+        rm "${snar_file}"
+        touch "${snar_file}"
     fi
-    ssh "${REMOTE_HOST}" mkdir -p "${DESTINATION_DIRECTORY}/${snapshot_basename}"
-    tar -zcg "${snapshot_file}" --exclude-from="${EXCLUDES_FILE}" "${TARGET_DIRECTORY}" | \
+    ssh "${REMOTE_HOST}" mkdir -p "${DESTINATION_DIRECTORY}"
+    tar -zcg "${snar_file}" --exclude-from="${EXCLUDES_FILE}" "${TARGET_DIRECTORIES[@]}" | \
          gpg --encrypt --recipient="${GPG_KEY_ID}" | \
-         ssh "${REMOTE_HOST}" dd of="${DESTINATION_DIRECTORY}/${snapshot_basename}-$(date --iso-8601=minutes).tar.gz.gpg" status="${status}"
+         ssh "${REMOTE_HOST}" dd of="${DESTINATION_DIRECTORY}/${ARCHIVE_NAME}-$(date --iso-8601=minutes).tar.gz.gpg" status="${status}"
 }
 
 function main() {
@@ -119,7 +111,7 @@ function main() {
         error "No GPG key ID set"
         exit 2
     fi
-    if [[ -z "${TARGET_DIRECTORY}" || -z "${DESTINATION_DIRECTORY}" ]]; then
+    if [[ -z "${TARGET_DIRECTORIES}" || -z "${DESTINATION_DIRECTORY}" ]]; then
         error "Missing required arguments"
         usage
         exit 1
